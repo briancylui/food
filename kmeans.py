@@ -21,7 +21,7 @@ def optimal_beta():
     return 0.1
 
 # Hyper-parameters
-K = optimal_K():
+K_opt = optimal_K():
 alpha = optimal_alpha()
 beta = optimal_beta()
 num_iter = 100
@@ -74,7 +74,7 @@ def clustering(K, num_iter, convergence_threshold, N):
     return (centroid, cluster_var, centroid_of, loss)
     
 cross_validate_K = dict()
-for i in range(K):
+for i in range(2 * K_opt):
     cross_validate_K[i] = clustering(i, num_iter, convergence_threshold, N)
 
 # Joel: The dictionary you want is exactly cross_validate_K here.
