@@ -77,4 +77,11 @@ cross_validate_K = dict()
 for i in range(2 * K_opt):
     cross_validate_K[i] = clustering(i, num_iter, convergence_threshold, N)
 
-# Joel: The dictionary you want is exactly cross_validate_K here.
+with open('cvK.json', 'w') as cvKfile:
+    json.dump(cross_validate_K,cvKfile)
+
+# Joel: The dictionary you want is exactly cross_validate_K here.  Get this dict from the cvK.json file by typing:
+# with open('cvK.json', 'r') as readcvK:
+#     cross_validate_K = js.load(readcvK)
+
+
