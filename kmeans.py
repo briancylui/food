@@ -33,17 +33,20 @@ for i in range(N):
     for j in range(i, N):
         num_common_types = len(c for c in businesses[i]['categories'] if c in businesses[j]['categories'])
         related[(i, j)] = num_common_types * 1. / (len(businesses[i]['categories']) + len(businesses[j]['categories']) - num_common_types)
+        related[(j, i)] = related[(i, j)]
 
 # Distance function for K-means clustering
 dist = defaultdict(float) # distance of (i, j)
 N = len(businesses)
 for i in range(N):
     for j in range(i, N):
-        d[(i, j)] = math.sqrt((businesses[i]['stars'] - businesses[j]['stars']) ** 2 + (businesses[i]['review_count'] - businesses[j]['review_count']) ** 2) + alpha * sum(1 - max(related[(x, y)] for y in businesses[j]['categories']) for x in businesses[i]['categories'])
+        dist[(i, j)] = math.sqrt((businesses[i]['stars'] - businesses[j]['stars']) ** 2 + (businesses[i]['review_count'] - businesses[j]['review_count']) ** 2) + alpha * sum(1 - max(related[(x, y)] for y in businesses[j]['categories']) for x in businesses[i]['categories'])
+        dist[(j, i)] = dist[(i, j)]
 
 def clustering(K, num_iter, convergence_threshold, N):
     centroid_of = defaultdict(int) # assignment of i
     centroid = [0] * K
+    cluster_var = defaultdict(float)
 
     for iter in range(num_iter):
         # If average change in centroids is smaller than convergence_threshold, then break.
@@ -57,7 +60,7 @@ def clustering(K, num_iter, convergence_threshold, N):
         for i in range(K):
             businesses_in_cluster = [b for b in range(N) if centroid_of[b] == i]
             old_centroid = centroid[i]
-            centroid[i] = min(( sum(dist[(j, k)] for k in businesses_in_cluster) * 1. / len(businesses_in_cluster) , j) for j in businesses_in_cluster)[1]
+            cluster_var[i], centroid[i] = min(( sum(dist[(j, k)] for k in businesses_in_cluster) * 1. / len(businesses_in_cluster) , j) for j in businesses_in_cluster)
             if old_centroid != centroid[i]: num_of_centroid_changes += 1
 
         # Evaluation
@@ -66,4 +69,12 @@ def clustering(K, num_iter, convergence_threshold, N):
         print centroid
 
         if ratio_of_centroid_changes < convergence_threshold: break
-        
+    
+    loss = sum(dist[(i, centroid_of[i])] for i in range(N)) * 1. / N
+    return (centroid, cluster_var, centroid_of, loss)
+    
+cross_validate_K = dict()
+for i in range(K):
+    cross_validate_K[i] = clustering(i, num_iter, convergence_threshold, N)
+
+# Joel: The dictionary you want is exactly cross_validate_K here.
