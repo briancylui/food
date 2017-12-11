@@ -1,12 +1,18 @@
 import json as js
 import numpy as np
 import math
+from collections import defaultdict
+import csv
+import pickle
+import os.path
 
 # Open the business JSON file.
 businesses = []
 with open('dataset/business.json', 'r') as business_file:
+    print 'Opened business.json file.'
     for line in business_file:
         businesses.append(js.loads(line))
+    print 'Finished loading business.json.'
 
 # desired output: dict[K] = tuple([all centroids], dict(cluster assignment), y (elbow loss)) for cross validation of K
 
@@ -21,29 +27,85 @@ def optimal_beta():
     return 0.1
 
 # Hyper-parameters
-K_opt = optimal_K():
+K_opt = optimal_K()
 alpha = optimal_alpha()
 beta = optimal_beta()
 num_iter = 100
 convergence_threshold = 1e-3
 
-# Relatedness function for the distance function
+# Constants
+N = len(businesses)
+
+# Import Richard's csv files
+related = defaultdict(float)
+business_types = defaultdict(string)
+if os.path.isfile('relatedness.pkl'):
+    with open('relatedness.pkl', 'rb') as f:
+        related = pickle.load(f)
+else:
+    cat_proportion = csv.reader(open('cat-proportion-shortened.csv'))
+    related_cats = defaultdict(float)
+    for line in cat_proportion:
+        related_cats[(line[0], line[1])] = float(line[2])
+    for key, value in related_cats.items():
+        cat1, cat2 = key
+        if cat1 not in business_types:
+            business_types.append(cat1)
+        if cat2 not in business_types:
+            business_types.append(cat2)
+        i = business_types.index(cat1)
+        j = business_types.index(cat2)
+        if (i, j) not in related:
+            related[(i, j)] = value
+        if (j, i) not in related:
+            related[(j, i)] = value
+
+    with open('relatedness.pkl', 'wb') as f:
+        pickle.dump(related, f, pickle.HIGHEST_PROTOCOL)
+    with 
+
+'''
+# Relatedness function for business types
+print 'Start constructing relatedness table.'
 related = defaultdict(float)
 for i in range(N):
     for j in range(i, N):
-        num_common_types = len(c for c in businesses[i]['categories'] if c in businesses[j]['categories'])
-        related[(i, j)] = num_common_types * 1. / (len(businesses[i]['categories']) + len(businesses[j]['categories']) - num_common_types)
+        print '%d %d' % (i, j)
+        num_common_types = len({c for c in businesses[i]['categories'] if c in businesses[j]['categories']})
+        if num_common_types == 0:
+            related[(i, j)] = 0
+            related[(j, i)] = 0
+            continue
+
+        denominator = len(businesses[i]['categories']) + len(businesses[j]['categories']) - num_common_types
+        print num_common_types, denominator
+        related[(i, j)] = num_common_types * 1. / denominator if denominator != 0 else 0
         related[(j, i)] = related[(i, j)]
+'''
 
 # Distance function for K-means clustering
 dist = defaultdict(float) # distance of (i, j)
-N = len(businesses)
-for i in range(N):
-    for j in range(i, N):
-        dist[(i, j)] = math.sqrt((businesses[i]['stars'] - businesses[j]['stars']) ** 2 + (businesses[i]['review_count'] - businesses[j]['review_count']) ** 2) + alpha * sum(1 - max(related[(x, y)] for y in businesses[j]['categories']) for x in businesses[i]['categories'])
-        dist[(j, i)] = dist[(i, j)]
+print 'Find stored distance function.'
+if os.path.isfile('distance.pkl'):
+    print 'Retrieve previous distance function'
+    with open('distance.pkl', 'rb') as f:
+        dist = pickle.load(f)
+    print 'Finished loading distance function'
+else:
+    print 'Start constructing distance table.'
+    for i in range(N):
+        for j in range(i, N):
+            dist[(i, j)] = math.sqrt((businesses[i]['stars'] - businesses[j]['stars']) ** 2 + (businesses[i]['review_count'] - businesses[j]['review_count']) ** 2) + alpha * sum(1 - max(related[(x, y)] for y in businesses[j]['categories']) for x in businesses[i]['categories'])
+            if i != j: dist[(j, i)] = dist[(i, j)]
+    print 'Finished constructing distance table.'
+    with open('distance.pkl', 'wb') as f:
+        pickle.dump(dist, f, pickle.HIGHEST_PROTOCOL)
+    print 'Saved new distance function'
+
 
 def clustering(K, num_iter, convergence_threshold, N):
+    print 'Start %d-means clustering' % K
+
     centroid_of = defaultdict(int) # assignment of i
     centroid = [0] * K
     cluster_var = defaultdict(float)
