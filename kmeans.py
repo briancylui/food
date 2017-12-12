@@ -6,9 +6,10 @@ import csv
 import pickle
 import os.path
 import random
+import matplotlib.pyplot as plt
 
 # Open the business JSON file.
-state = 'IL'
+state = 'HLD'
 businesses = []
 with open('dataset/' + state + '.json', 'r') as business_file:
     print 'Opened business.json file.'
@@ -33,7 +34,7 @@ K_opt = optimal_K()
 alpha = optimal_alpha()
 beta = optimal_beta()
 num_iter = 100
-convergence_threshold = 1e-3
+convergence_threshold = 3
 
 # Constants
 N = len(businesses)
@@ -161,8 +162,9 @@ def clustering(K, num_iter, convergence_threshold, N):
     centroid = random.sample(range(N), K)
     cluster_var = defaultdict(float)
 
-
+    consecutive_no_learning_trials = 0
     for iter in range(num_iter):
+        if consecutive_no_learning_trials > convergence_threshold: break
         # If average change in centroids is smaller than convergence_threshold, then break.
         num_of_centroid_changes = 0
         # Assignment step:
@@ -171,14 +173,16 @@ def clustering(K, num_iter, convergence_threshold, N):
 
             #num_of_centroid_changes = 0
         # Adjustment step:
-        for i in range(len(centroid)):
-            businesses_in_cluster = [b for b in range(N) if centroid_of[b] == i]
+        for i in range(K):
+            businesses_in_cluster = [b for b in range(N) if centroid_of[b] == centroid[i]]
             old_centroid = centroid[i]
-            cluster_var[i], centroid[i] = min(( sum(dist[(j, k)] for k in businesses_in_cluster) * 1. / len(businesses_in_cluster) , j) for j in businesses_in_cluster)
+            cluster_var[i], centroid[i] = min(( sum([dist[(j, k)] for k in businesses_in_cluster] ) * 1. / len(businesses_in_cluster) , j) for j in businesses_in_cluster) if businesses_in_cluster else (0, random.choice(range(N)))
             if old_centroid != centroid[i]: num_of_centroid_changes += 1
 
         # Evaluation
         ratio_of_centroid_changes = num_of_centroid_changes * 1. / K
+        if ratio_of_centroid_changes == 0: consecutive_no_learning_trials += 1
+        else: consecutive_no_learning_trials == 0
         print 'Iteration %d: centroids:' % iter
         print centroid
 
@@ -188,11 +192,18 @@ def clustering(K, num_iter, convergence_threshold, N):
     return (centroid, cluster_var, centroid_of, loss)
     
 cross_validate_K = dict()
-for i in range(1, 2 * K_opt):
+for i in range(1, 2 * K_opt + 1):
     cross_validate_K[i] = clustering(i, num_iter, convergence_threshold, N)
 
 with open('cvK' + state + '.json', 'w') as cvKfile:
     js.dump(cross_validate_K,cvKfile)
+
+losses = np.array([cross_validate_K[i][3] for i in range(1, 2 * K_opt + 1)])
+cluster_num = np.arange(1, 2 * K_opt + 1)
+plt.plot(cluster_num, losses)
+plt.xlabel('Number of clusters')
+plt.ylabel('Loss')
+plt.show()
 
 # Joel: The dictionary you want is exactly cross_validate_K here.  Get this dict from the cvK.json file by typing:
 # with open('cvK.json', 'r') as readcvK:
