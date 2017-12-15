@@ -8,14 +8,18 @@ from sklearn.metrics import silhouette_samples, silhouette_score
 import pickle
 
 clusterValueDict = {}  # key: no. of clusters; value: (centroids, varianceList, clusterAssignments(dict), loss)
-with open('cvKHLD.json', 'r') as readcvK:
+with open('cvKIL.json', 'r') as readcvK:
      clusterValueDict = js.load(readcvK)
 
 trainingExamples_Dict = {}
-with open('distanceHLD.pkl', 'rb') as f:
+with open('distanceIL.pkl', 'rb') as f:
     trainingExamples_Dict = pickle.load(f)
+print(clusterValueDict.keys())
+centroids, varianceList, clusterAssignments, loss = clusterValueDict['1']
+SIZE = len(clusterAssignments)
+print(SIZE)
 
-trainingExamples = np.zeros((175, 175))
+trainingExamples = np.zeros((SIZE, SIZE))
 for key in trainingExamples_Dict:
     x_value, y_value = key
     trainingExamples[x_value][y_value] = trainingExamples_Dict[key]
@@ -49,7 +53,7 @@ def plotSilhouette(clusterValueDict, trainingExamples):
         if int(clusterNumber) > 1:
             A[int(clusterNumber) - 1] = int(clusterNumber)
             centroids, varianceList, clusterAssignments_dict, loss = clusterValueDict[clusterNumber]
-            clusterAssignments = np.zeros(175)
+            clusterAssignments = np.zeros(SIZE)
             for i in clusterAssignments_dict:
                 clusterAssignments[int(i)] = clusterAssignments_dict[i]
             print(clusterAssignments)
@@ -140,8 +144,8 @@ def plotSilhouetteDetailed(clusterValueDict, trainingExamples):
                      fontsize=14, fontweight='bold')
         plt.show()
 
-#plotOptimalKGraphElbow(clusterValueDict)
+plotOptimalKGraphElbow(clusterValueDict)
 plotSilhouette(clusterValueDict, trainingExamples)
-#plotClusterVariance(clusterValueDict, trainingExamples)
+plotClusterVariance(clusterValueDict, trainingExamples)
 #plotSilhouetteDetailed(clusterValueDict, trainingExamples)
 #plotBiasVariance(trainingLossDict, testLossDict)
