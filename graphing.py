@@ -8,13 +8,12 @@ from sklearn.metrics import silhouette_samples, silhouette_score
 import pickle
 
 clusterValueDict = {}  # key: no. of clusters; value: (centroids, varianceList, clusterAssignments(dict), loss)
-with open('cvKIL.json', 'r') as readcvK:
+with open('cvKIL_changed.json', 'r') as readcvK:
      clusterValueDict = js.load(readcvK)
 
 trainingExamples_Dict = {}
-with open('distanceIL.pkl', 'rb') as f:
+with open('distance_changedIL.pkl', 'rb') as f:
     trainingExamples_Dict = pickle.load(f)
-print(clusterValueDict.keys())
 centroids, varianceList, clusterAssignments, loss = clusterValueDict['1']
 SIZE = len(clusterAssignments)
 print(SIZE)
@@ -107,19 +106,22 @@ def plotSilhouetteDetailed(clusterValueDict, trainingExamples):
         fig, ax = plt.subplots()
         fig.set_size_inches(18, 7)
         ax.set_xlim([-0.1, 1])
-        ax.set_ylim([0, len(trainingExamples) + (clusterNumber + 1) * 10])
-        centroids, varianceList, clusterAssignments, loss = clusterValueDict[clusterNumber]
+        ax.set_ylim([0, len(trainingExamples) + (int(clusterNumber) + 1) * 10])
+        centroids, varianceList, clusterAssignments_dict, loss = clusterValueDict[clusterNumber]
+        clusterAssignments = np.zeros(SIZE)
+        for i in clusterAssignments_dict:
+            clusterAssignments[int(i)] = clusterAssignments_dict[i]
         silhouette_avg = silhouette_score(trainingExamples, clusterAssignments)
+        print(silhouette_avg)
         sample_silhouette_values = silhouette_samples(trainingExamples, clusterAssignments)
         y_lower = 10
-        for i in range(clusterNumber):
-            ith_cluster_silhouette_values = sample_silhouette_values[cluster_labels == i]
+        for i in range(int(clusterNumber)):
+            ith_cluster_silhouette_values = sample_silhouette_values[clusterAssignments == i]
             ith_cluster_silhouette_values.sort()
-
             size_cluster_i = ith_cluster_silhouette_values.shape[0]
             y_upper = y_lower + size_cluster_i
 
-            color = cm.spectral(float(i) / n_clusters)
+            color = cm.spectral(float(i) / int(clusterNumber))
             ax.fill_betweenx(np.arange(y_lower, y_upper),
                               0, ith_cluster_silhouette_values,
                               facecolor=color, edgecolor=color, alpha=0.7)
@@ -140,7 +142,7 @@ def plotSilhouetteDetailed(clusterValueDict, trainingExamples):
         ax.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
 
         # Labeling the clusters
-        plt.suptitle(("Silhouette analysis = %d" % clusterNumber),
+        plt.suptitle(("Silhouette analysis = %d" % int(clusterNumber)),
                      fontsize=14, fontweight='bold')
         plt.show()
 

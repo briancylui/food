@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 # Open the business JSON file.
 state = 'IL'
 businesses = []
-with open('dataset/' + state + '.json', 'r') as business_file:
+with open(state + '.json', 'r') as business_file:
     print 'Opened business.json file.'
     for line in business_file:
         businesses.append(js.loads(line))
@@ -24,7 +24,7 @@ def optimal_K():
     return 10
 
 def optimal_alpha():
-    return 0.1
+    return 0.6
 
 def optimal_beta():
     return 0.1
@@ -47,7 +47,7 @@ if os.path.isfile('relatedness.pkl') and os.path.isfile('businesstypes.pkl'):
         related = pickle.load(f)
     with open('businesstypes.pkl', 'rb') as f:
         business_types = pickle.load(f)
-        
+
 else:
     cat_proportion = csv.reader(open('cat-proportion-shortened.csv'))
     related_cats = defaultdict(float)
@@ -69,8 +69,8 @@ else:
     with open('relatedness.pkl', 'wb') as f:
         pickle.dump(related, f, pickle.HIGHEST_PROTOCOL)
     with open('businesstypes.pkl', 'wb') as f:
-        pickle.dump(business_types, f, pickle.HIGHEST_PROTOCOL)
-
+        pickle.dump(business_types, f, pickle.HIGHESTt_PROTOCOL)
+print("Done! - First step")
 
 '''
 # Relatedness function for business types
@@ -96,10 +96,11 @@ dist = defaultdict(float) # distance of (i, j)
 sq_diff_ratings = defaultdict(int)
 sq_diff_review_counts = defaultdict(int)
 related_diff = defaultdict(float)
+similarity = defaultdict(float)
 print 'Find stored distance function.'
-if os.path.isfile('distance' + state + '.pkl'):
+if os.path.isfile('distance_changed' + state + '.pkl'):
     print 'Retrieve previous distance function'
-    with open('distance' + state + '.pkl', 'rb') as f:
+    with open('distance_changed' + state + '.pkl', 'rb') as f:
         dist = pickle.load(f)
     print 'Finished loading distance function'
 else:
@@ -129,28 +130,45 @@ else:
             pickle.dump(sq_diff_review_counts, f,pickle.HIGHEST_PROTOCOL)
         print 'Finished constructing sq_diff_review_counts table'
 
-    if os.path.isfile('related_diff' + state + '.pkl'):
-        with open('related_diff' + state + '.pkl', 'rb') as f:
+    if os.path.isfile('related_diff_changed' + state + '.pkl'):
+        with open('related_diff_changed' + state + '.pkl', 'rb') as f:
             related_diff = pickle.load(f)
     else:
         print 'Start constructing related_diff table'
         for i in range(N):
             for j in range(i, N):
-                related_diff[(i, j)] = sum(1 - max([related[(business_types.index(x), business_types.index(y))] for y in businesses[j]['categories']] or [0]) for x in businesses[i]['categories'])
+                related_diff[(i, j)] = max([1 - max([related[(business_types.index(x), business_types.index(y))] for y in businesses[j]['categories']] or [0]) for x in businesses[i]['categories']] or [0])
 #                print 'related_diff[(%d, %d)] = %.5f' % (i, j, related_diff[(i, j)])
                 if i != j: related_diff[(j, i)] = related_diff[(i, j)]
-        with open('related_diff' + state + '.pkl', 'wb') as f:
+        with open('related_diff_changed' + state + '.pkl', 'wb') as f:
             pickle.dump(related_diff, f,pickle.HIGHEST_PROTOCOL)
         print 'Finished constructing related_diff table'
-
+    if os.path.isfile('common-user-prop-' + state + '.csv'):
+        with open('common-user-prop-' + state + '.csv', 'rb') as f:
+            reader = csv.reader(f, delimiter = ',', quotechar = '|')
+            for row in reader:
+                if float(row[2]) == 0:
+                    similarity[(row[0], row[1])] = 100000
+                    similarity[(row[1], row[0])] = 100000
+                else:
+                    similarity[(row[0], row[1])] = 1/float(row[2])
+                    similarity[(row[1], row[0])] = 1/float(row[2])
+    else:
+        raise "Where is common user??"
+    minimum_review_count = min(sq_diff_review_counts.values())
+    maximum_review_count = max(sq_diff_review_counts.values())
+    minimum_ratings = min(sq_diff_ratings.values())
+    maximum_ratings = max(sq_diff_ratings.values())
+    max_similarity = 100000
+    min_similarity = min(similarity.values())
     print 'Start constructing distance table.'
     for i in range(N):
         for j in range(i, N):
-            dist[(i, j)] = math.sqrt(sq_diff_ratings[(i, j)] + sq_diff_review_counts[(i, j)]) + alpha * related_diff[(i, j)]
+            dist[(i, j)] = (1 - alpha) * math.sqrt((sq_diff_ratings[(i, j)] - minimum_ratings)/float(maximum_ratings - minimum_ratings) + (sq_diff_review_counts[(i, j)] - minimum_ratings)/float(maximum_ratings - minimum_ratings)) + alpha * (related_diff[(i, j)] + (similarity[(i, j)] - min_similarity)/float(max_similarity - min_similarity))
             #print 'dist[(%d, %d)] = %.2f' % (i, j, dist[(i, j)])
             if i != j: dist[(j, i)] = dist[(i, j)]
     print 'Finished constructing distance table.'
-    with open('distance' + state + '.pkl', 'wb') as f:
+    with open('distance_changed' + state + '.pkl', 'wb') as f:
         pickle.dump(dist, f, pickle.HIGHEST_PROTOCOL)
     print 'Saved new distance function'
 
@@ -187,15 +205,15 @@ def clustering(K, num_iter, convergence_threshold, N):
         print centroid
 
         #if ratio_of_centroid_changes < convergence_threshold: break
-    
+
     loss = sum(dist[(i, centroid_of[i])] for i in range(N)) * 1. / N
     return (centroid, cluster_var, centroid_of, loss)
-    
+
 cross_validate_K = dict()
 for i in range(1, 2 * K_opt + 1):
     cross_validate_K[i] = clustering(i, num_iter, convergence_threshold, N)
 
-with open('cvK' + state + '.json', 'w') as cvKfile:
+with open('cvK' + state + '_changed.json', 'w') as cvKfile:
     js.dump(cross_validate_K,cvKfile)
 
 losses = np.array([cross_validate_K[i][3] for i in range(1, 2 * K_opt + 1)])
@@ -208,5 +226,3 @@ plt.show()
 # Joel: The dictionary you want is exactly cross_validate_K here.  Get this dict from the cvK.json file by typing:
 # with open('cvK.json', 'r') as readcvK:
 #     cross_validate_K = js.load(readcvK)
-
-
