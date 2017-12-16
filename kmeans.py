@@ -1,4 +1,4 @@
-import json as js
+port json as js
 import numpy as np
 import math
 from collections import defaultdict
@@ -9,7 +9,7 @@ import random
 import matplotlib.pyplot as plt
 
 # Open the business JSON file.
-state = 'HLD'
+state = 'IL'
 businesses = []
 with open('dataset/' + state + '.json', 'r') as business_file:
     print 'Opened business.json file.'
