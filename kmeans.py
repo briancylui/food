@@ -9,7 +9,7 @@ import random
 import matplotlib.pyplot as plt
 
 # Open the business JSON file.
-state = 'IL'
+state = 'HLD'
 businesses = []
 with open(state + '.json', 'r') as business_file:
     print 'Opened business.json file.'
@@ -98,9 +98,9 @@ sq_diff_review_counts = defaultdict(int)
 related_diff = defaultdict(float)
 similarity = defaultdict(float)
 print 'Find stored distance function.'
-if os.path.isfile('distance_changed' + state + '.pkl'):
+if os.path.isfile('distance' + state + '.pkl'):
     print 'Retrieve previous distance function'
-    with open('distance_changed' + state + '.pkl', 'rb') as f:
+    with open('distance' + state + '.pkl', 'rb') as f:
         dist = pickle.load(f)
     print 'Finished loading distance function'
 else:
@@ -130,8 +130,8 @@ else:
             pickle.dump(sq_diff_review_counts, f,pickle.HIGHEST_PROTOCOL)
         print 'Finished constructing sq_diff_review_counts table'
 
-    if os.path.isfile('related_diff_changed' + state + '.pkl'):
-        with open('related_diff_changed' + state + '.pkl', 'rb') as f:
+    if os.path.isfile('related_diff' + state + '.pkl'):
+        with open('related_diff' + state + '.pkl', 'rb') as f:
             related_diff = pickle.load(f)
     else:
         print 'Start constructing related_diff table'
@@ -168,7 +168,7 @@ else:
             #print 'dist[(%d, %d)] = %.2f' % (i, j, dist[(i, j)])
             if i != j: dist[(j, i)] = dist[(i, j)]
     print 'Finished constructing distance table.'
-    with open('distance_changed' + state + '.pkl', 'wb') as f:
+    with open('distance' + state + '.pkl', 'wb') as f:
         pickle.dump(dist, f, pickle.HIGHEST_PROTOCOL)
     print 'Saved new distance function'
 
@@ -177,7 +177,8 @@ def clustering(K, num_iter, convergence_threshold, N):
     print 'Start %d-means clustering' % K
 
     centroid_of = defaultdict(int) # assignment of i
-    centroid = random.sample(range(N), K)
+    train_size = int(0.9 * N)
+    centroid = random.sample(range(train_size), K)
     cluster_var = defaultdict(float)
 
     consecutive_no_learning_trials = 0
@@ -186,15 +187,15 @@ def clustering(K, num_iter, convergence_threshold, N):
         # If average change in centroids is smaller than convergence_threshold, then break.
         num_of_centroid_changes = 0
         # Assignment step:
-        for i in range(N):
+        for i in range(train_size):
             centroid_of[i] = min((dist[(i, j)], j) for j in centroid)[1]
 
             #num_of_centroid_changes = 0
         # Adjustment step:
         for i in range(K):
-            businesses_in_cluster = [b for b in range(N) if centroid_of[b] == centroid[i]]
+            businesses_in_cluster = [b for b in range(train_size) if centroid_of[b] == centroid[i]]
             old_centroid = centroid[i]
-            cluster_var[i], centroid[i] = min(( sum([dist[(j, k)] for k in businesses_in_cluster] ) * 1. / len(businesses_in_cluster) , j) for j in businesses_in_cluster) if businesses_in_cluster else (0, random.choice(range(N)))
+            cluster_var[i], centroid[i] = min(( sum([dist[(j, k)] for k in businesses_in_cluster] ) * 1. / len(businesses_in_cluster) , j) for j in businesses_in_cluster) if businesses_in_cluster else (0, random.choice(range(train_size)))
             if old_centroid != centroid[i]: num_of_centroid_changes += 1
 
         # Evaluation
@@ -206,21 +207,29 @@ def clustering(K, num_iter, convergence_threshold, N):
 
         #if ratio_of_centroid_changes < convergence_threshold: break
 
-    loss = sum(dist[(i, centroid_of[i])] for i in range(N)) * 1. / N
-    return (centroid, cluster_var, centroid_of, loss)
+    train_loss = sum(dist[(i, centroid_of[i])] for i in range(N)) * 1. / train_size
+
+    for i in range(train_size, N):
+        centroid_of[i] = min((dist[(i, j)], j) for j in centroid)[1]
+    test_loss = sum(dist[(i, centroid_of[i])] for i in range(train_size, N)) * 1. / (N - train_size)
+
+    return (centroid, cluster_var, centroid_of, train_loss, test_loss)
 
 cross_validate_K = dict()
 for i in range(1, 2 * K_opt + 1):
     cross_validate_K[i] = clustering(i, num_iter, convergence_threshold, N)
 
-with open('cvK' + state + '_changed.json', 'w') as cvKfile:
+with open('cvK' + state + '.json', 'w') as cvKfile:
     js.dump(cross_validate_K,cvKfile)
 
-losses = np.array([cross_validate_K[i][3] for i in range(1, 2 * K_opt + 1)])
+train_losses = np.array([cross_validate_K[i][3] for i in range(1, 2 * K_opt + 1)])
+test_losses = np.array([cross_validate_K[i][4] for i in range(1, 2 * K_opt + 1)])
 cluster_num = np.arange(1, 2 * K_opt + 1)
-plt.plot(cluster_num, losses)
+plt.plot(cluster_num, train_losses)
+plt.plot(cluster_num, test_losses)
 plt.xlabel('Number of clusters')
 plt.ylabel('Loss')
+plt.legend(['Training loss', 'Test loss'])
 plt.show()
 
 # Joel: The dictionary you want is exactly cross_validate_K here.  Get this dict from the cvK.json file by typing:
