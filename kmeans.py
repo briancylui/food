@@ -9,7 +9,7 @@ import random
 import matplotlib.pyplot as plt
 
 # Open the business JSON file.
-state = 'HLD'
+state = 'IL'
 businesses = []
 with open(state + '.json', 'r') as business_file:
     print 'Opened business.json file.'
