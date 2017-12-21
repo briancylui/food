@@ -31,7 +31,7 @@ with open('review_training.json', 'r') as f:
     for line in f:
         data = json.loads(line)
         count += 1
-        if count%10000 == 0:
+        if count % 10000 == 0:
             print 'Done', count
         if data['business_id'] in businessIDList_training:
         #reviews.append(data)
@@ -167,4 +167,4 @@ with open('review_test.json', 'r') as f:
 			else:
 				finalscores[1] += 1
 accuracy = finalscores[0]/float(sum(finalscores))
-print(accuracy)
+print('%.2f\%' % (accuracy*100))
